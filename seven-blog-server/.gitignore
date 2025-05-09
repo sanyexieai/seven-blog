@@ -1,0 +1,6 @@
+/target
+.env
+Cargo.lock
+seven_blog.db
+seven_blog.db-shm
+seven_blog.db-wal
