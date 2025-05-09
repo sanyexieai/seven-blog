@@ -2,10 +2,10 @@ use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
-use sea_orm::{DatabaseConnection, EntityTrait, Set, ActiveModelTrait, QueryFilter, ColumnTrait};
+use sea_orm::{DatabaseConnection, EntityTrait, Set, ActiveModelTrait, QueryFilter, ColumnTrait, QueryTrait};
 use crate::{
     error::AppError,
-    models::user::{CreateUserDto, LoginDto, TokenResponse},
+    models::user::CreateUserDto,
     entity::user,
     entity::user_info,
     utils::jwt::create_token,
@@ -24,8 +24,12 @@ impl UserService {
 
     pub async fn register(&self, dto: CreateUserDto) -> Result<String, AppError> {
         // 检查用户是否已存在
-        let exists = user::Entity::find()
-            .filter(user::Column::Username.eq(&dto.username))
+        let query = user::Entity::find()
+            .filter(user::Column::Username.eq(&dto.username));
+        
+        // println!("SQL: {}", query.build(sea_orm::DatabaseBackend::Sqlite).to_string());
+        
+        let exists = query
             .one(&self.db)
             .await?
             .is_some();

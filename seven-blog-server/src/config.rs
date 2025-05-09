@@ -58,7 +58,7 @@ impl Config {
                 if !std::path::Path::new(&db_path).exists() {
                     std::fs::File::create(&db_path).expect("Failed to create SQLite database file");
                 }
-                self.database_url.clone()
+                format!("{}?mode=rwc", self.database_url)
             }
             _ => self.database_url.clone(),
         }

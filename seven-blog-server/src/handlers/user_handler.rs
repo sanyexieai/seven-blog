@@ -6,7 +6,7 @@ use crate::{
     services::user_service::UserService,
 };
 
-/// 用户注册
+// 用户注册
 #[utoipa::path(
     post,
     path = "/register",
@@ -20,7 +20,7 @@ use crate::{
 )]
 #[post("/register", format = "json", data = "<dto>")]
 pub async fn register(
-    user_service: &rocket::State<UserService>,
+    user_service: &State<UserService>,
     dto: Json<CreateUserDto>,
 ) -> Result<Json<TokenResponse>, AppError> {
     let token = user_service.register(dto.into_inner()).await?;
@@ -42,7 +42,7 @@ pub async fn register(
 )]
 #[post("/login", format = "json", data = "<dto>")]
 pub async fn login(
-    user_service: &rocket::State<UserService>,
+    user_service: &State<UserService>,
     dto: Json<LoginDto>,
 ) -> Result<Json<TokenResponse>, AppError> {
     let token = user_service

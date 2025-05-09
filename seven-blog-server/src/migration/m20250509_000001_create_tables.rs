@@ -6,6 +6,7 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        println!("开始创建用户信息表...");
         // 创建用户信息表
         manager
             .create_table(
@@ -22,7 +23,9 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
+        println!("用户信息表创建成功");
 
+        println!("开始创建用户表...");
         // 创建用户表
         manager
             .create_table(
@@ -51,6 +54,7 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
+        println!("用户表创建成功");
 
         // 创建角色表
         manager

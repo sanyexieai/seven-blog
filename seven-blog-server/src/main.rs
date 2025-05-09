@@ -1,9 +1,11 @@
 use rocket::{get, routes, Build, Rocket};
 use sea_orm::{Database, DatabaseConnection};
-use utoipa::OpenApi;
+use services::user_service::UserService;
 use utoipa_swagger_ui::SwaggerUi;
 use sea_orm_migration::MigratorTrait;
+use utoipa::OpenApi;
 
+mod api;
 mod config;
 mod entity;
 mod error;
@@ -13,32 +15,8 @@ mod services;
 mod migration;
 mod utils;
 
-#[derive(OpenApi)]
-#[openapi(
-    paths(
-        handlers::user_handler::register,
-        handlers::user_handler::login,
-    ),
-    components(
-        schemas(
-            models::user::User,
-            models::user::UserInfo,
-            models::user::CreateUserDto,
-            models::user::LoginDto,
-            models::user::TokenResponse,
-            error::AppError,
-        )
-    ),
-    tags(
-        (name = "users", description = "用户管理接口")
-    )
-)]
-struct ApiDoc;
+use handlers::user_handler;
 
-#[get("/")]
-fn index() -> &'static str {
-    "Hello, world!"
-}
 
 #[rocket::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -46,30 +24,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = config::Config::from_env()?;
     let db_url = config.database_url();
+    println!("数据库连接 URL: {}", db_url);
 
     // 创建数据库连接
     let db = Database::connect(&db_url).await?;
+    println!("数据库连接成功");
 
     // 运行数据库迁移
-    migration::Migrator::up(&db, None).await?;
+    println!("开始执行数据库迁移...");
+    match migration::Migrator::up(&db, None).await {
+        Ok(_) => println!("数据库迁移成功"),
+        Err(e) => {
+            println!("数据库迁移失败: {:?}", e);
+            return Err(e.into());
+        }
+    }
 
     // 创建用户服务
-    // let user_service = UserService::new(pool, config.jwt_secret);
+    let user_service = UserService::new(db, config.jwt_secret);
 
     // 创建 Rocket 实例
     let mut rocket = rocket::build()
-        .mount("/api", routes![index]);
-        // .mount("/api/auth", routes![user_handler::register, user_handler::login])
-        // .manage(user_service);
+        .mount("/", routes![user_handler::register, user_handler::login])
+        .manage(user_service);
 
     // 只在开发环境添加 Swagger
     if std::env::var("RUST_ENV").unwrap_or_else(|_| "development".to_string()) == "development" {
         rocket = rocket.mount(
-            "/",
+            "/swagger",
             SwaggerUi::new("/swagger-ui/<_..>")
-                .url("/api-docs/openapi.json", ApiDoc::openapi())
+                .url("/api-docs/openapi.json", api::ApiDoc::openapi())
         );
     }
+
     rocket.launch().await?;
 
     Ok(())
