@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rocket = "0.5.0"
+rocket = { version = "0.5", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite", "postgres", "mysql", "chrono", "uuid"] }
@@ -18,3 +18,5 @@ thiserror = "1.0"
 utoipa = { version = "4.1", features = ["rocket_extras"] }
 utoipa-swagger-ui = { version = "5.0", features = ["rocket"] }
 argon2 = "0.5"
+sea-orm = { version = "0.12", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros", "with-chrono", "with-json"] }
+sea-orm-migration = "0.12"

@@ -1,4 +1,4 @@
-use rocket::serde::json::Json;
+use rocket::{post, serde::json::Json, State};
 use utoipa::OpenApi;
 use crate::{
     error::AppError,

@@ -1,108 +1,66 @@
-#[macro_use]
-extern crate rocket;
-
-#[derive(Debug)]
-pub enum DbPool {
-    Postgres(Pool<Postgres>),
-    Sqlite(Pool<Sqlite>),
-    MySql(Pool<MySql>),
-}
-
-pub mod config;
-pub mod error;
-pub mod handlers;
-pub mod models;
-pub mod services;
-pub mod utils;
-
-use config::{Config, DatabaseType};
-use handlers::user_handler;
-use rocket::serde::json::Json;
-use serde::{Deserialize, Serialize};
-use services::user_service::UserService;
-use sqlx::{Pool, Sqlite, Postgres, MySql};
+use rocket::{get, routes, Build, Rocket};
+use sea_orm::{Database, DatabaseConnection};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
+use sea_orm_migration::MigratorTrait;
+
+mod config;
+mod entity;
+mod error;
+mod handlers;
+mod models;
+mod services;
+mod migration;
+mod utils;
 
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        user_handler::register,
-        user_handler::login,
+        handlers::user_handler::register,
+        handlers::user_handler::login,
     ),
     components(
         schemas(
-            crate::models::user::CreateUserDto,
-            crate::models::user::LoginDto,
-            crate::models::user::TokenResponse,
+            models::user::User,
+            models::user::UserInfo,
+            models::user::CreateUserDto,
+            models::user::LoginDto,
+            models::user::TokenResponse,
+            error::AppError,
         )
     ),
     tags(
-        (name = "auth", description = "认证相关接口")
+        (name = "users", description = "用户管理接口")
     )
 )]
 struct ApiDoc;
 
-#[derive(Debug, Serialize, Deserialize)]
-struct Message {
-    message: String,
-}
-
 #[get("/")]
-fn index() -> Json<Message> {
-    Json(Message {
-        message: "Welcome to Seven Blog API".to_string(),
-    })
+fn index() -> &'static str {
+    "Hello, world!"
 }
 
-#[launch]
-async fn rocket() -> _ {
-    let config = Config::from_env();
-    
-    // 创建数据库连接池
-    let pool = match config.database_type {
-        DatabaseType::Postgres => {
-            DbPool::Postgres(
-                sqlx::postgres::PgPoolOptions::new()
-                    .max_connections(5)
-                    .connect(&config.database_url)
-                    .await
-                    .expect("Failed to create PostgreSQL pool")
-            )
-        }
-        DatabaseType::Sqlite => {
-            // 确保 SQLite 数据库文件存在
-            let db_path = config.database_url.replace("sqlite:", "");
-            if !std::path::Path::new(&db_path).exists() {
-                std::fs::File::create(&db_path).expect("Failed to create SQLite database file");
-            }
-            DbPool::Sqlite(
-                sqlx::sqlite::SqlitePoolOptions::new()
-                    .max_connections(5)
-                    .connect(&config.database_url)
-                    .await
-                    .expect("Failed to create SQLite pool")
-            )
-        }
-        DatabaseType::MySql => {
-            DbPool::MySql(
-                sqlx::mysql::MySqlPoolOptions::new()
-                    .max_connections(5)
-                    .connect(&config.database_url)
-                    .await
-                    .expect("Failed to create MySQL pool")
-            )
-        }
-    };
+#[rocket::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    dotenv::dotenv().ok();
+
+    let config = config::Config::from_env()?;
+    let db_url = config.database_url();
+
+    // 创建数据库连接
+    let db = Database::connect(&db_url).await?;
+
+    // 运行数据库迁移
+    migration::Migrator::up(&db, None).await?;
 
     // 创建用户服务
-    let user_service = UserService::new(pool, config.jwt_secret);
+    // let user_service = UserService::new(pool, config.jwt_secret);
 
     // 创建 Rocket 实例
     let mut rocket = rocket::build()
-        .mount("/api", routes![index])
-        .mount("/api/auth", routes![user_handler::register, user_handler::login])
-        .manage(user_service);
+        .mount("/api", routes![index]);
+        // .mount("/api/auth", routes![user_handler::register, user_handler::login])
+        // .manage(user_service);
 
     // 只在开发环境添加 Swagger
     if std::env::var("RUST_ENV").unwrap_or_else(|_| "development".to_string()) == "development" {
@@ -112,6 +70,7 @@ async fn rocket() -> _ {
                 .url("/api-docs/openapi.json", ApiDoc::openapi())
         );
     }
+    rocket.launch().await?;
 
-    rocket
+    Ok(())
 }

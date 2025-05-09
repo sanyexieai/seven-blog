@@ -2,78 +2,50 @@ use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
 };
-use sqlx::{Pool, Sqlite, Postgres, MySql};
+use sea_orm::{DatabaseConnection, EntityTrait, Set, ActiveModelTrait, QueryFilter, ColumnTrait};
 use crate::{
     error::AppError,
-    models::user::{CreateUserDto, User, UserInfo},
+    models::user::{CreateUserDto, LoginDto, TokenResponse},
+    entity::user,
+    entity::user_info,
     utils::jwt::create_token,
-    DbPool,
 };
-use uuid;
 use chrono;
 
 pub struct UserService {
-    pool: DbPool,
+    db: DatabaseConnection,
     jwt_secret: String,
 }
 
 impl UserService {
-    pub fn new(pool: DbPool, jwt_secret: String) -> Self {
-        Self { pool, jwt_secret }
+    pub fn new(db: DatabaseConnection, jwt_secret: String) -> Self {
+        Self { db, jwt_secret }
     }
 
     pub async fn register(&self, dto: CreateUserDto) -> Result<String, AppError> {
         // 检查用户是否已存在
-        let exists = false; // 暂时跳过用户存在检查
-        /*
-        let exists = match &self.pool {
-            DbPool::Sqlite(pool) => {
-                sqlx::query!(
-                    "SELECT EXISTS(SELECT 1 FROM users WHERE username = ?) as exists",
-                    dto.username
-                )
-                .fetch_one(pool)
-                .await?
-                .exists
-                .unwrap_or(false)
-            }
-            DbPool::Postgres(pool) => {
-                sqlx::query!(
-                    "SELECT EXISTS(SELECT 1 FROM users WHERE username = $1) as exists",
-                    dto.username
-                )
-                .fetch_one(pool)
-                .await?
-                .exists
-                .unwrap_or(false)
-            }
-            DbPool::MySql(pool) => {
-                sqlx::query!(
-                    "SELECT EXISTS(SELECT 1 FROM users WHERE username = ?) as exists",
-                    dto.username
-                )
-                .fetch_one(pool)
-                .await?
-                .exists
-                .unwrap_or(false)
-            }
-        };
-        */
+        let exists = user::Entity::find()
+            .filter(user::Column::Username.eq(&dto.username))
+            .one(&self.db)
+            .await?
+            .is_some();
 
         if exists {
             return Err(AppError::UserExists);
         }
 
         // 创建用户信息
-        let user_info = UserInfo {
-            id: None,
-            nickname: dto.name,
-            avatar: "default_avatar.png".to_string(),
-            intro: "这个人很懒，什么都没写...".to_string(),
-            email: None,
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
+        let user_info = user_info::ActiveModel {
+            nickname: Set(dto.name),
+            avatar: Set("default_avatar.png".to_string()),
+            intro: Set("这个人很懒，什么都没写...".to_string()),
+            email: Set(Some(dto.email)),
+            created_at: Set(chrono::Utc::now()),
+            updated_at: Set(chrono::Utc::now()),
+            ..Default::default()
         };
+
+        let user_info = user_info.insert(&self.db).await?;
 
         // 哈希密码
         let salt = SaltString::generate(&mut OsRng);
@@ -84,24 +56,20 @@ impl UserService {
             .to_string();
 
         // 创建用户
-        let user = User {
-            id: None,
-            username: dto.username,
-            password_hash,
-            user_info_id: user_info.id.unwrap_or(0),
-            login_type: 0,
-            ip_address: None,
-            ip_source: None,
-            last_login_time: None,
-            is_disable: false,
-            is_super: false,
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
+        let user = user::ActiveModel {
+            username: Set(dto.username),
+            password_hash: Set(password_hash),
+            user_info_id: Set(user_info.id),
+            login_type: Set(0),
+            is_disable: Set(false),
+            is_super: Set(false),
+            created_at: Set(chrono::Utc::now()),
+            updated_at: Set(chrono::Utc::now()),
+            ..Default::default()
         };
 
-        // TODO: 插入数据库获取 ID
-        // 临时使用固定 ID 用于测试
-        let user_id = 1;
+        let user = user.insert(&self.db).await?;
+        let user_id = user.id;
 
         // 生成 JWT token
         let token = create_token(user_id, &self.jwt_secret)?;
@@ -109,7 +77,32 @@ impl UserService {
     }
 
     pub async fn login(&self, username: &str, password: &str) -> Result<String, AppError> {
-        // 暂时返回错误
-        Err(AppError::UserNotFound)
+        // 查询用户
+        let user = user::Entity::find()
+            .filter(user::Column::Username.eq(username))
+            .one(&self.db)
+            .await?
+            .ok_or(AppError::UserNotFound)?;
+
+        // 验证密码
+        let parsed_hash = PasswordHash::new(&user.password_hash)
+            .map_err(|_| AppError::AuthError("密码哈希解析失败".to_string()))?;
+        
+        if !Argon2::default()
+            .verify_password(password.as_bytes(), &parsed_hash)
+            .is_ok()
+        {
+            return Err(AppError::AuthError("密码错误".to_string()));
+        }
+
+        // 更新最后登录时间
+        let user_id = user.id;
+        let mut user: user::ActiveModel = user.into();
+        user.last_login_time = Set(Some(chrono::Utc::now()));
+        user.update(&self.db).await?;
+
+        // 生成 JWT token
+        let token = create_token(user_id, &self.jwt_secret)?;
+        Ok(token)
     }
 } 

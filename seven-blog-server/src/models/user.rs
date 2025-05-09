@@ -78,9 +78,7 @@ pub struct CreateUserDto {
     /// 昵称
     pub name: String,
     /// 邮箱
-    pub email: Option<String>,
-    /// 手机号
-    pub phone: Option<String>,
+    pub email: String,
 }
 
 /// 登录请求

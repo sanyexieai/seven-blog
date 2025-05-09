@@ -2,21 +2,28 @@ use rocket::http::Status;
 use rocket::serde::json::Json;
 use serde::Serialize;
 use thiserror::Error;
+use utoipa::ToSchema;
 
-#[derive(Error, Debug)]
+#[derive(Debug, Error, ToSchema)]
 pub enum AppError {
+    #[error("用户已存在")]
+    #[schema(example = "用户已存在")]
+    UserExists,
+    #[error("用户不存在")]
+    #[schema(example = "用户不存在")]
+    UserNotFound,
     #[error("认证错误: {0}")]
+    #[schema(example = "认证失败")]
     AuthError(String),
     #[error("数据库错误: {0}")]
-    DatabaseError(#[from] sqlx::Error),
+    #[schema(example = "数据库错误")]
+    DatabaseError(#[from] sea_orm::DbErr),
     #[error("JWT错误: {0}")]
+    #[schema(example = "JWT错误")]
     JwtError(#[from] jsonwebtoken::errors::Error),
     #[error("密码错误")]
+    #[schema(example = "密码错误")]
     PasswordError,
-    #[error("用户不存在")]
-    UserNotFound,
-    #[error("用户已存在")]
-    UserExists,
 }
 
 #[derive(Serialize)]
