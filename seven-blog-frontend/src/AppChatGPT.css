@@ -1,0 +1,111 @@
+.chatgpt-app {
+  display: flex;
+  height: 100vh;
+  background: #f5f6fa;
+  font-family: 'Segoe UI', 'Arial', sans-serif;
+}
+
+.sidebar {
+  width: 240px;
+  background: #202123;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.sidebar-header {
+  font-size: 1.5rem;
+  font-weight: bold;
+  padding: 24px 20px 16px 20px;
+  border-bottom: 1px solid #353740;
+}
+
+.conversation-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  flex: 1;
+}
+
+.conversation-item {
+  padding: 16px 20px;
+  cursor: pointer;
+  border-bottom: 1px solid #353740;
+  transition: background 0.2s;
+}
+
+.conversation-item.active, .conversation-item:hover {
+  background: #353740;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  box-shadow: -1px 0 4px rgba(0,0,0,0.03);
+}
+
+.chat-history {
+  flex: 1;
+  padding: 32px 24px 16px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.message {
+  max-width: 60%;
+  padding: 12px 18px;
+  border-radius: 12px;
+  font-size: 1rem;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.message.user {
+  align-self: flex-end;
+  background: #e6f0ff;
+  color: #222;
+}
+
+.message.assistant {
+  align-self: flex-start;
+  background: #f3f3f3;
+  color: #222;
+}
+
+.chat-input-wrapper {
+  display: flex;
+  padding: 16px 24px;
+  border-top: 1px solid #eee;
+  background: #fafbfc;
+}
+
+.chat-input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 1rem;
+  outline: none;
+  margin-right: 12px;
+  background: #fff;
+}
+
+.send-btn {
+  padding: 10px 22px;
+  background: #10a37f;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.send-btn:hover {
+  background: #0e8c6c;
+} 
